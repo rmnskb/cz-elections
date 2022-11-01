@@ -1,19 +1,61 @@
-{
-    "_comment": 
-"Důchod: důchod…
-Podnikání: podnikatel, majitel,
-Živnostníci: OSVČ, živnostník
-Dělníci: technik, dělník, řidič, zámečník, automechanik, zedník, elektrikář, skladník, truhlář, kuchař, údržbář, strojník, mechanik, instalatér, seřizovač, svářeč,  výroba, operátor,
-Finance: účetní, ekonom, finanční
-Studenti: student
-Státní zaměstnance: učitel, hasič, policista, úřednice, administrativní, pedagog, sociální, vychovatel, mistr, referent
-Medicina: zdravotní, lékař, chirurg
-Soukromý sektor: prodavač, zaměstnanec, asistent
-Paid leave: dovolené, v domácnosti, nezaměstnaná
-Manažeři: manažer, obchodní zástupce, projektant, jednatel, vedoucí, ředitel
-Politika: starosta
-Zemědělství: zemědělec, traktorista
-Právo: právník, advokát,
-Technicky-stavební obor: projektant, konstruktér, elektro-mechanik, technolog, inženýr, architekt,
-IT: programátor",
-}
+{"povolani": {
+    "duchod": {
+        "name": "důchodce",
+        "var": ["důchod", "penze", "penzi"]
+    },
+    "podnik":{
+        "name": "podnikatel",
+        "var": ["podnik", "business", "majitel", "vlastník"]
+    },
+    "zivnost":{
+        "name": "živnostník",
+        "var": ["živnost", "OSVČ", "osoba samostatně výdělečně činná"]
+    },
+    "remeslo":{
+        "name": "řemeslník",
+        "var": ["řemesl", "truhlář", "kadeřn", "mlynář", "pekař", "slád", "sklenář", "sklář", "kovář", "hodinář", "zlatní", "zedník", "instalatér", "malíř", "pokrávač", "klempíř", "holič", "kominík", "kominice", "kosmetička"]
+    },
+    "soukzam":{
+        "name": "zaměstnanec v soukromém sektoru",
+        "var": ["děln", "techni", "mechani", "řidič", "strojn", "obraběč", "operátor", "horn", "seřizovač", "svářeč", "lakýrn", "montér", "skladn", "kuchař", "cukrář", "prodavač", "barman", "číšn"]
+    },
+    "finance":{
+        "name": "finančnictví",
+        "var": ["účetní", "daňov", "ekonom", "finanč", "bank", "pojišť", "pojist", "bank", "invest", "invest"]
+    },
+    "student":{
+        "name": "student",
+        "var": ["student"]
+    },
+    "akademik":{
+        "name": "akademik",
+        "var": ["doktor", "akademi", "děkan", "rektor", "katedr", "univerzit", "vysokoškol", "vysokoškolský pedagog"]
+    },
+    "statzam":{
+        "name": "státní zaměstnanec",
+        "var": ["stát", "učitel", "policist", "hasič", "voják", "celn", "úředn", "pedago", "vychovatel", "ministerstv", "náměst", "základní škol", "střední škol", "učiliště", "vězeňský dozorce"]
+    },
+    "zdravotnictvi":{
+        "name": "zaměstnanec ve zdravotnictví",
+        "var": ["zdravot", "lékař", "nemocni", "primář", "medic", "záchran", "fyzioterapeut", "chirurg", "pediatr", "ortoped", "kardiolog", "gynekolo", "zubař"]
+    },
+    "politik":{
+        "name": "politik",
+        "var": ["politik", "ještě doplnit"]
+    }
+    ,
+    "nezam":{
+        "name": "nezaměstnaný",
+        "var": ["matěř", "nezaměstnan", "v domácnosti"]
+    }
+    ,
+    "ještě doplnit":{
+        "name": "dopln",
+        "var": ["dopln"]
+    }
+    ,
+    "nezaraz":{
+        "name": "nezařazeno",
+        "var": []
+    }
+}}
