@@ -1,81 +1,96 @@
 {    "duchod": {
         "name": "důchodce",
-        "var": ["důchod", "penze", "penzi"]
+        "short_name": "penz",
+        "var": ["důchod", "penze", "penzi", "senior"]
     },
     "podnik":{
         "name": "podnikatel",
-        "var": ["podnik", "business", "majitel", "vlastník", "jednatel"]
+        "short_name": "podnik",
+        "var": ["podnik", "business", "majitel", "vlastník", "jednatel", "autodopravce", "stavebník", "stavitel", "nakladatel", "produkční"]
     },
     "zivnost":{
         "name": "živnostník",
+        "short_name": "živno",
         "var": ["živnost", "OSVČ", "osoba samostatně výdělečně činná"]
     },
     "remeslo":{
         "name": "řemeslník",
-        "var": ["řemesl", "truhlář", "kadeřn", "mlynář", "pekař", "slád", "sklenář", "sklář", "kovář", "hodinář", "zlatní", "zedník", "instalatér", "pokrávač", "klempíř", "holič", "kominík", "kominice", "kosmetička", "elektrikář"]
+        "short_name": "řemesl",
+        "var": ["řemesl", "truhlář", "kadeřn", "mlynář", "pekař", "slád", "sklenář", "sklář", "kovář", "hodinář", "zlatní", "zedník", "instalatér", "pokrývač", "klempíř", "holič", "kominík", "kominice", "elektrikář", "zámeč", "obráběč", "soustruž", "řezn", "stavař", "kuchař", "cukrář", "strojn", "obraběč", "svářeč", "lakýrn", "mistr výroby", "tesař"]
     },
     "soukzam":{
         "name": "zaměstnanec v soukromém sektoru",
-        "var": ["děln", "techni", "mechani", "řidič", "strojn", "obraběč", "operátor", "horn", "seřizovač", "svářeč", "lakýrn", "montér", "skladn", "kuchař", "cukrář", "prodavač", "barman", "číšn"]
+        "short_name": "zam sk",
+        "var": ["děln", "techni", "mechani", "řidič", "operátor", "horn", "seřizovač", "montér", "skladn", "prodavač", "barman", "číšn", "obchod", "administra", "zaměstnanec", "servírka", "číšník", "asistent", "bezpečnost", "logisti", "recepční", "referent", "dispeč", "laborant", "lesní", "knihkup", "uklízeč", "prodej", "pošto", "sekretář", "restaura", "provoz", "masér", "údržbář", "kosmetička", "zahradn", "obsluha", "poklad"]
     },
     "finance":{
         "name": "finančnictví",
-        "var": ["účetní", "daňov", "ekonom", "finanč", "bank", "pojišť", "pojist", "bank", "invest", "invest", "CFO"]
+        "short_name": "fin",
+        "var": ["účetní", "daňov", "ekonom", "finanč", "bank", "pojišť", "pojist", "bank", "invest", "invest", "CFO", "makléř", "auditor"]
     },
     "student":{
         "name": "student",
+        "short_name": "stud",
         "var": ["student"]
     },
     "akademik":{
-        "name": "akademik",
-        "var": ["doktor", "akademi", "děkan", "rektor", "katedr", "univerzit", "vysokoškol", "vysokoškolský pedagog"]
+        "name": "vědecký nebo akademický pracovník",
+        "short_name": "akad",
+        "var": ["doktor", "akademi", "děkan", "rektor", "katedr", "univerzit", "vysokoškol", "vysokoškolský pedagog", "vědec"]
     },
     "statzam":{
         "name": "státní zaměstnanec",
-        "var": ["stát", "učitel", "policist", "hasič", "voják", "celn", "úředn", "pedago", "vychovatel", "ministerstv", "náměst", "základní škol", "střední škol", "učiliště", "vězeňský dozorce", "soud", "státní zástup"]
+        "short_name": "zam st",
+        "var": ["stát", "učitel", "policist", "hasič", "voják", "celn", "úředn", "pedago", "vychovatel", "ministerstv", "náměst", "základní škol", "střední škol", "učiliště", "vězeňský dozorce", "soud", "státní zástup", "sociál", "stráž", "výpravčí", "středoškol"]
     },
     "zdravotnictvi":{
         "name": "zaměstnanec ve zdravotnictví",
-        "var": ["zdravot", "lékař", "nemocni", "primář", "medic", "záchran", "fyzioterapeut", "chirurg", "pediatr", "ortoped", "kardiolog", "gynekolo", "zubař", "psychiatr", "psycholo"]
+        "short_name": "zam zd",
+        "var": ["zdravot", "lékař", "nemocni", "primář", "medic", "záchran", "fyzioterapeut", "chirurg", "pediatr", "ortoped", "kardiolo", "gynekolo", "zubař", "psychiatr", "psycholo", "lékár", "pečovatel", "ošetřovat"]
     },
     "politik":{
         "name": "politik",
-        "var": ["politik", "poslan", "senát", "kraj", "zastup", "starosta", "radní", "hejtman"]
+        "short_name": "poli",
+        "var": ["politik", "poslan", "senát", "kraj", "zastup", "starost", "radní", "hejtman", "primátor"]
     },
     "nezam":{
         "name": "nezaměstnaný",
-        "var": ["matěř", "nezaměstnan", "v domácnosti"]
+        "short_name": "nezam",
+        "var": ["mateř", "nezaměstnan", "v domácnosti", "rodič"]
     },
     "manager":{
         "name": "manažer",
-        "var": ["manažer", "vedoucí", "ředitel", "CEO", "předseda", "představen"]
+        "short_name": "mngr",
+        "var": ["manažer", "vedoucí", "ředitel", "CEO", "předseda", "představen", "manager"]
     },
     "zemedel":{
         "name": "zemědělství",
-        "var": ["zeměděl", "jzd", "traktor", "kombajn", "zootechni"]
-    },
-    "naboz":{
-        "name": "náboženství",
-        "var": ["kněz", "jeptiška", "biskup", "církev"]
+        "short_name": "zeměděl",
+        "var": ["zeměděl", "jzd", "traktor", "kombajn", "zootechni", "vinař", "agro"]
     },
     "pravo":{
         "name": "právo",
+        "short_name": "právo",
         "var": ["právn", "advokát"]
     },
     "odbor":{
         "name": "odborný pracovník",
-        "var": ["projektant", "konstruktér", "architekt", "elektro-mechanik", "inženýr", "překladatel", "chemi", "biolo", "fyzi", "matemat", "IT", "programátor", "vývojář", "analyti"]
+        "short_name": "odb prac",
+        "var": ["projektant", "konstruktér", "architekt", "elektro-mechanik", "inženýr", "překladatel", "chemi", "biolo", "fyzi", "matemat", "IT", "programátor", "vývojář", "analyti", "technolo", "ekolo", "informatik", "histori", "knihovn", "novin", "porad", "strojař", "energeti", "geodet", "geolo", "personalist", "kontrolor", "konzultant", "publicist", "marketing", "sociolo", "vodohospod", "politolo", "redak", "tisk", "archeolo"]
     },
     "umeni":{
         "name": "umělec",
-        "var": ["here", "zpěv", "hudebn", "tanečn", "spisovatel", "sochař", "malíř", "fotograf", "uměl", "režisér", "kameraman"]
+        "short_name": "uměl",
+        "var": ["here", "zpěv", "hudebn", "tanečn", "spisovatel", "sochař", "malíř", "fotograf", "uměl", "režisér", "kameraman", "grafik", "výtvar"]
     },
     "sport":{
         "name": "sportovec",
-        "var": ["sportovec", "trenér", "fotbal", "tenis", "hokej"]
+        "short_name": "sport",
+        "var": ["sportovec", "trenér", "fotbal", "tenis", "hokej", "sport"]
     },
     "nezaraz":{
         "name": "nezařazeno",
+        "short_name": "nezař",
         "var": []
     }
 }
