@@ -27,10 +27,10 @@ kraj_list <- c("Hlavní město Praha", "Středočeský kraj", "Jihočeský kraj"
                "Ústecký kraj", "Liberecký kraj", "Královéhradecký kraj", "Pardubický kraj", "Kraj Vysočina",
                "Jihomoravský kraj", "Olomoucký kraj", "Zlínský kraj", "Moravskoslezský kraj")
 
-strany <- read_csv2("legislative-elections/strany.csv",
+strany <- read_csv2("../legislative-elections/strany.csv",
                     locale = locale(encoding = "UTF-8"))
 
-obor_json <- fromJSON("dict_occupations.json")
+obor_json <- fromJSON("../dict_occupations.json")
 ```
 
 ```{r obor_fun}
