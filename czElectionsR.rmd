@@ -12,7 +12,7 @@ output:
   theme: readable
 ---
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 15, fig.height = 10)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 12, fig.height = 8)
 Sys.setlocale("LC_ALL", "German.UTF-8") # czech diacritics support
 ```
 ### Introduction
@@ -104,7 +104,7 @@ clean_data <- function(df){
            sex = factor(sex),
            region = factor(region),
            ideology = factor(ideology),
-           mandate = factor(mandate))
+           mandate = factor(mandate, levels = c("yes", "no")))
 
   return(df1)
 }
@@ -285,7 +285,8 @@ library(ROSE)
 
 snemRose <- ROSE(mandate ~ ., data = snem_ml)$data %>%
   # since age cannot have non-integer value, all values will be rounded down
-  mutate(age = floor(age))
+  mutate(age = floor(age),
+         mandate = factor(mandate, levels = c("yes", "no")))
 
 table(snemRose$mandate)
 ```
@@ -306,8 +307,8 @@ The dataset will be divided into train and test by 3:1 ratio
 trainIndex <- createDataPartition(snemRose$mandate, p = 0.75,
                                   list = FALSE, times = 1)
 
-snemTrain <- snemRose[trainIndex, ]
-snemTest <- snemRose[-trainIndex, ]
+snemTrain <- snemDummified[trainIndex, ]
+snemTest <- snemDummified[-trainIndex, ]
 
 nrow(snemTrain)
 nrow(snemTest)
@@ -330,7 +331,9 @@ glmModel <- train(
   mandate ~ ., data = snemTrain,
   method = "glm",
   trControl = ctrl,
-  metric = "ROC"
+  metric = "ROC",
+  # normalising and principal component analysis are applied as preprocess steps
+  preProcess = c("center", "scale", "pca")
 )
 
 glmModel
@@ -356,7 +359,8 @@ randfModel <- train(
   method = "ranger",
   trControl = ctrl,
   tuneGrid = randfGrid,
-  metric = "ROC"
+  metric = "ROC",
+  preProcess = c("center", "scale", "pca")
 )
 
 randfModel
@@ -374,7 +378,8 @@ svcModel <- train(
   method = "svmLinear2",
   trControl = ctrl,
   tuneGrid = svcGrid,
-  metric = "ROC"
+  metric = "ROC",
+  preProcess = c("center", "scale", "pca")
 )
 
 svcModel
@@ -400,7 +405,8 @@ predAndProb <- function(origDf, model){
   # binding the testing set with the predicted probabilities
   modDf <- cbind(origDf, predict(model, newdata = origDf, type = "prob") %>%
     # predicted class will be chosen based on biggest probability
-                            mutate("pred" = as.factor(names(.)[apply(., 1, which.max)])))
+                            mutate("pred" = as.factor(names(.)[apply(., 1, which.max)]))) %>%
+    mutate(pred = factor(pred, levels = c("yes", "no")))
 
   return(modDf)
 }
@@ -409,20 +415,22 @@ snemGml <- predAndProb(snemTest, glmModel)
 snemRandf <- predAndProb(snemTest, randfModel)
 snemSvc <- predAndProb(snemTest, svcModel)
 ```
-Confusion matrix shows the performance of an algorithm, with right predictions being on the main diagonal and wrong predictions on counter diagonal.
-$TN$ and $TP$ are on the main diagonal, $FN$ and $FP$ are on the counter diagonal.
+Confusion matrix shows the performance of an algorithm, with right predictions being on the main diagonal and wrong predictions on counter diagonal, so that
+$True Positives$ and $True Negatives$ are on the former, $False Positives$ and $False Negatives$ are on the latter.
 
-Following metrics will be used for models assessing:
+Following metrics were chosen for models assessing:
 
-* **Precision**: $\frac{TP}{TP + FP}$
+* **Precision**: $\frac{TP}{TP + FP}$ -- how precisely model assigns positive class
 
-* **Sensitivity**: $\frac{TP}{TP + FN}$
+* **Sensitivity (Recall)**: $\frac{TP}{TP + FN}$ -- how well a model can identify true positives
 
-* **Specificity**: $\frac{TN}{TN + FP}$
+* **Specificity**: $\frac{TN}{TN + FP}$ -- how well a model can identify true negatives
 
-* **ROC AUC**: area under the ROC curve
+* **ROC AUC**: area under the ROC curve ($TP$ rate against the $FP$ rate)
 
-The logistic regression defines the right class most times, although it often classifies negative class as positive, which resembles in lower sensitivity rate.
+***
+
+The logistic regression defines the right class most times, although it often classifies negative class as positive ($FP$, upper right corner), which resembles in lower precision rate.
 ```{r gml metrics 1}
 library(yardstick)
 
@@ -436,11 +444,11 @@ The confusion matrix above confirms the metrics below:
 # yardstick's metric_Set will be used for models' assessment
 classMetrics <- metric_set(precision, sensitivity, specificity, roc_auc)
 
-classMetrics(snemGml, truth = mandate, estimate = pred, no)
+classMetrics(snemGml, truth = mandate, estimate = pred, yes)
 
 ```
 Random forest's matrix on the other side looks much better. The model performs fairly well, the counter diagonal holds smaller numbers this time.
-Although this algorithm still struggles with assigning the positive class correctly, sensitivity rate resembles this characteristic.
+This algorithm has the best metrics on testing data out of all others.
 ```{r randf metrics 1}
 conf_mat(snemRandf, mandate, pred) %>%
   autoplot(type = "heatmap") +
@@ -448,8 +456,9 @@ conf_mat(snemRandf, mandate, pred) %>%
   scale_fill_gradient(low="#D6EAF8", high = "#2E86C1")
 ```
 ```{r randf metrics 2}
-classMetrics(snemRandf, truth = mandate, estimate = pred, no)
+classMetrics(snemRandf, truth = mandate, estimate = pred, yes)
 ```
+
 The Support Vector Classifier model performs almost on the same level as logistic regression does, although this time the algorithm has hard time assigning the negative class right, which is resembled by precision rate.
 ```{r svc metrics 1}
 conf_mat(snemSvc, mandate, pred) %>%
@@ -458,7 +467,7 @@ conf_mat(snemSvc, mandate, pred) %>%
   scale_fill_gradient(low="#D6EAF8", high = "#2E86C1")
 ```
 ```{r svc metrics 2}
-classMetrics(snemSvc, truth = mandate, estimate = pred, no)
+classMetrics(snemSvc, truth = mandate, estimate = pred, yes)
 ```
 
 ### Conclusion
@@ -470,9 +479,4 @@ In this report following results have been discovered:
 * Candidates from private sector, businesspeople and current politics take part in the elections the most
 * Candidate with no university degree tend to be right-wing, candidates with university degree tend to pick right-wing ideology less often
 
-Three models were compared during the modelling process: logistic regression, random forest and support vector classifier. The best one of them was random forest algorithm with ROC AUC around 0.92.
-Additionally, logistic regression's coefficients may be compared to see what features contribute the most to candidates' chances of winning (according to this model):
-```{r glm summary}
-summary(glmModel)
-```
-Age does not contribute much to overall chance, current politicians and lawyers have better chances in winning. Region and sex do not play a huge role. Right-wing ideology may contribute negatively, whilst centrists have higher chances.
+Three models were compared during the modelling process: logistic regression, random forest and support vector classifier. The best one of them was random forest algorithm with ROC AUC around 0.94.
