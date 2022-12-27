@@ -50,7 +50,7 @@ obor_json <- fromJSON("dict_occupations.json")
 ```
 
 ```{r obor_fun, class.source = 'fold-hide'}
-# Checks to what field does candidate's profession belongs to (such as finance, law, medicine etc.) with the help of keywords
+# Check to what field does candidate's profession belongs to (such as finance, law, medicine etc.) with the help of keywords
 obor_fun <- function(val, dict){
   for(i in seq_along(dict)){
     for(j in seq_along(dict[[i]]$var)){
@@ -152,21 +152,20 @@ Although the former requires some investigation.
 ```{r NAs}
 colSums(is.na(snem_long))
 ```
-The missing age stands for missing candidates on initial elections paper. These entities can be deleted.
+The missing age stands for missing candidates on initial elections paper. These entities can be deleted without information loss.
 ```{r age NA}
 snem_long %>%
         filter(is.na(age))
 ```
-As can be seen below, the right-wing ideology prevails among the candidates, so we can impute the said ideology to missing data without the risk of messing up the ratios.
-```{r ideology table}
-table(snem_long$ideology)
-```
+
+Randomly generated values will be imputed into missing ideologies to preserve the original ratios.
 ```{r NA imputation}
 snem_long <- snem_long %>%
         # deleting the dummy NA rows
-        filter(!is.na(age)) %>%
-        # imputing the majority group into NA values
-        replace_na(list(ideology = as.factor("Pravice")))
+        drop_na(age)
+
+# imputing the array of 3 levels into NA values
+snem_long[is.na(snem_long$ideology), "ideology"] <- gl(3, 1, 203, labels = levels(snem_long$ideology))
 
 colSums(is.na(snem_long))
 ```
@@ -176,7 +175,7 @@ Now when all missing data is taken care of, the exploratory analysis may be perf
 #### Candidates' age distribution
 The first visualisation will be candidates' age distribution by sex throughout the years.
 The distributions seem consistent in all years. The median line shows us that mostly half of the candidates are younger than ~45 years.
-Males and females does not differ much in terms of distribution, albeit female candidates tend to be younger than their male opponents.
+Males and females do not differ much in terms of distribution, albeit female candidates tend to be younger than their male opponents.
 ```{r age dist}
 ggplot(snem_long, aes(age)) +
         geom_density(aes(colour = sex, fill = sex), alpha = 0.1) +
@@ -233,7 +232,7 @@ snem_long %>%
 This visualisation shows the most frequent fields of work.
 Private sector has the biggest representation, most candidates coming from this field have no university degree.
 The second most frequent group of candidates are those who are in politics already (e.g. mayors, governors), candidates coming from this field often possess university degree.
-The third field is businesspeople, university degrees are not prevalent in this group.
+The third field is businesspeople, university degrees are not prevalent in this group as well.
 ```{r fields}
 snem_long %>%
   mutate(field = fct_reorder(field, degree, .fun = "length", .desc = FALSE)) %>%
@@ -314,9 +313,11 @@ nrow(snemTrain)
 nrow(snemTest)
 ```
 
-5 way cross validation will be used during training process.
+5 way cross validation will be used during training process for all models.
 Following three algorithms are to be compared: Logistic Regression, Random Forest and Support Vector Classifier.
 Since the task is binary classification, ROC metric will be used to pick the best model during the grid search process.
+
+Logistic regression does not have any hyperparameters to tune, so that no grid search will be performed.
 ```{r glm}
 # 5-way Cross Validation initialisation
 ctrl <- trainControl(method = "cv",
@@ -334,6 +335,13 @@ glmModel <- train(
 
 glmModel
 ```
+
+The random forest model has three hyperparameters:
+
+* **mtry**, which is randomly selected predictors, in our case the maximum value is 6 -- number of original features
+* **splitrule** -- method for trees splitting, in this grid only standard "gini" rule is used
+* **min.node.size** -- minimal node size, which is basically the depth of a tree
+
 ```{r randf}
 library(ranger)
 
@@ -353,6 +361,8 @@ randfModel <- train(
 
 randfModel
 ```
+
+The SVC model has only one hyperparameter -- **cost**. It stands for regularisation power, in our case it will be either 0.1 or 1.
 
 ```{r svc}
 library(e1071)
@@ -377,7 +387,7 @@ resamps <- resamples(list(GLM = glmModel,
 
 summary(resamps)
 ```
-As can be seen from the summary above and the plot below, Random Forest has the best ROC metric on training data, picking at ~0.92.
+As can be seen from the summary above and the plot below, Random Forest has the best ROC metric on training data, peaking at ~0.92.
 SVC model has the biggest variance of sensitivity and specificity from all the models.
 ```{r resamps comparison}
 bwplot(resamps, layout = c(3, 1))
@@ -399,16 +409,27 @@ snemGml <- predAndProb(snemTest, glmModel)
 snemRandf <- predAndProb(snemTest, randfModel)
 snemSvc <- predAndProb(snemTest, svcModel)
 ```
-
 Confusion matrix shows the performance of an algorithm, with right predictions being on the main diagonal and wrong predictions on counter diagonal.
+$TN$ and $TP$ are on the main diagonal, $FN$ and $FP$ are on the counter diagonal.
+
+Following metrics will be used for models assessing:
+
+* **Precision**: $\frac{TP}{TP + FP}$
+
+* **Sensitivity**: $\frac{TP}{TP + FN}$
+
+* **Specificity**: $\frac{TN}{TN + FP}$
+
+* **ROC AUC**: area under the ROC curve
+
 The logistic regression defines the right class most times, although it often classifies negative class as positive, which resembles in lower sensitivity rate.
 ```{r gml metrics 1}
 library(yardstick)
 
 conf_mat(snemGml, mandate, pred) %>%
     autoplot(type = "heatmap") +
-        labs(title = "Logistic regression's confusion matrix") +
-        scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+        labs(title = "Confusion matrix of logistic regression model") +
+        scale_fill_gradient(low="#D6EAF8", high = "#2E86C1")
 ```
 The confusion matrix above confirms the metrics below:
 ```{r gml metrics 2}
@@ -419,12 +440,12 @@ classMetrics(snemGml, truth = mandate, estimate = pred, no)
 
 ```
 Random forest's matrix on the other side looks much better. The model performs fairly well, the counter diagonal holds smaller numbers this time.
-Although this algorithm still struggles with assigning the positive class correctly, sensitivity rate still resembles this characteristic.
+Although this algorithm still struggles with assigning the positive class correctly, sensitivity rate resembles this characteristic.
 ```{r randf metrics 1}
 conf_mat(snemRandf, mandate, pred) %>%
   autoplot(type = "heatmap") +
-  labs(title = "Random forest's confusion matrix") +
-  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+  labs(title = "Confusion matrix of random forest model") +
+  scale_fill_gradient(low="#D6EAF8", high = "#2E86C1")
 ```
 ```{r randf metrics 2}
 classMetrics(snemRandf, truth = mandate, estimate = pred, no)
@@ -433,18 +454,18 @@ The Support Vector Classifier model performs almost on the same level as logisti
 ```{r svc metrics 1}
 conf_mat(snemSvc, mandate, pred) %>%
   autoplot(type = "heatmap") +
-  labs(title = "Support vecto classifier's confusion matrix") +
-  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+  labs(title = "Confusion matrix of support vector classifier model") +
+  scale_fill_gradient(low="#D6EAF8", high = "#2E86C1")
 ```
 ```{r svc metrics 2}
 classMetrics(snemSvc, truth = mandate, estimate = pred, no)
 ```
 
 ### Conclusion
-In this report following results have been found out:
+In this report following results have been discovered:
 
 * Candidates' age distribution is almost symmetric
-* Sex ratio is 3:1 throughout the years
+* Sex ratio is 3 males to 1 female throughout the years
 * Right-wing ideology prevails among the candidates, albeit elected candidates represent the ideologies equally
 * Candidates from private sector, businesspeople and current politics take part in the elections the most
 * Candidate with no university degree tend to be right-wing, candidates with university degree tend to pick right-wing ideology less often
