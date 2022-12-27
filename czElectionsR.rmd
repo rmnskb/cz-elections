@@ -1,0 +1,457 @@
+---
+title: "Analysing candidates to the Chamber of Deputies throughout the elections"
+author: "Bogdan Romenskii"
+date: "`r format(Sys.time(), '%d.%m.%Y')`"
+output:
+ html_document:
+  df_print: paged
+  code_folding: show
+  toc: yes
+  toc_float: yes
+  toc_depth: 4
+  theme: readable
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 15, fig.height = 10)
+Sys.setlocale("LC_ALL", "German.UTF-8") # czech diacritics support
+```
+### Introduction
+In this report data about candidates to the Chamber of Deputies of the Czech Republic will be analysed. The said data was gathered during the elections in the years 2006 - 2021. The source is [Czech Statistical Office](https://www.volby.cz/opendata/opendata.htm).
+The following analysis will answer these questions:
+
+* [What is candidates' age distribution?](#candidates-age-distribution)
+* [What is men to women ratio?](#sex-ratio)
+* [Which ideology prevails among the candidates?](#candidates-ideologies-count-throughout-the-regions)
+* [What fields of work are the most frequent?](#the-most-frequent-fields-of-work)
+* [Does university education have any influence on candidates' ideology?](#candidates-ideologies-ratio)
+
+[In the last part](#modelling) a binary classification algorithm will be trained to define whether the candidate will be elected based on the given features.
+```{r}
+library(plyr) # mapvalues function
+library(tidyverse) # data manipulation library
+library(jsonlite) # for JSON files manipulation
+library(glue) # for python f-string analogue
+```
+
+### Data uploading and preprocessing
+In the following cells auxiliary files and functions will be uploaded and defined for further use
+```{r auxiliary files, class.source = 'fold-hide'}
+# list of the regions of the Czech Republic
+kraj_list <- c("Hlavní město Praha", "Středočeský kraj", "Jihočeský kraj", "Plzeňský kraj", "Karlovarský kraj",
+               "Ústecký kraj", "Liberecký kraj", "Královéhradecký kraj", "Pardubický kraj", "Kraj Vysočina",
+               "Jihomoravský kraj", "Olomoucký kraj", "Zlínský kraj", "Moravskoslezský kraj")
+
+# data about political parties and their ideology (left-wing - right-wing)
+strany <- read_csv2("legislative-elections/strany.csv",
+                    locale = locale(encoding = "UTF-8"))
+
+# key words for candidates' field definition
+obor_json <- fromJSON("dict_occupations.json")
+```
+
+```{r obor_fun, class.source = 'fold-hide'}
+# Checks to what field does candidate's profession belongs to (such as finance, law, medicine etc.) with the help of keywords
+obor_fun <- function(val, dict){
+  for(i in seq_along(dict)){
+    for(j in seq_along(dict[[i]]$var)){
+      if(grepl(dict[[i]]$var[j], tolower(val), fixed = TRUE)){
+        return(dict[[i]]$name)
+      }
+    }
+  }
+  return("jine")
+}
+```
+
+```{r clean_data function, class.source = 'fold-hide'}
+# Clean and prepare a dataframe containing data from different elections for further visualisation and modelling purposes.
+clean_data <- function(df){
+  df1 <- df %>%
+    # creates a new column with name and surname as one
+    mutate(name = paste(JMENO, PRIJMENI, sep = " "),
+           # checks whether the candidate has any titles, if so - university degree is set to 1
+           degree = if_else(
+             !is.na(TITULPRED) | !is.na(TITULZA), "yes", "no"
+           ),
+           # maps regions' names
+           region = mapvalues(VOLKRAJ, 1:14, kraj_list),
+           # transforms mandate to standard form
+           mandate = if_else(
+             MANDAT == "A" | MANDAT == "1", "yes", "no"
+           ),
+           # obor_fun function is applied on a POVOLANI column, unlists is used twice after that
+           field = unlist(
+             unlist(
+               lapply(df$POVOLANI, function(x) lapply(x, obor_fun, obor_json)),
+               recursive = FALSE),
+             recursive = FALSE)) %>%
+    # creates gender column based on surname ending
+    mutate(sex = if_else(
+      substr(name, nchar(name), nchar(name)) == "á", "F", "M"
+    )) %>%
+    # joins another table to map candidates' ideology based on their party
+    left_join(strany %>%
+                select(VSTRANA, Ideologie),
+              by = c("NSTRANA" = "VSTRANA")) %>%
+    # selects only relevant columns
+    select(name, VEK, degree, field, sex, region, Ideologie, mandate) %>%
+    # renames some of the columns to match the standard format
+    rename("age" = "VEK",
+           "ideology" = "Ideologie") %>%
+    # changes data types to factors in the according columns
+    mutate(degree = factor(degree),
+           field = factor(field),
+           sex = factor(sex),
+           region = factor(region),
+           ideology = factor(ideology),
+           mandate = factor(mandate))
+
+  return(df1)
+}
+```
+The data after cleaning consists of 9 columns:
+
+* **name**: candidate's name and surname
+* **age**
+* **degree**: whether the candidate has university degree
+* **field**: field of work
+* **sex**
+* **region**
+* **ideology**: ideology of the party that proposed the candidate
+* **mandate**: whether the candidate received mandate eventually
+* **year**: the year the elections were held
+
+The data from all available elections will be combined to one dataframe for further visualisation and modelling purposes.
+```{r csv uploads}
+snem_list <- list()
+years <- c("2006", "2010", "2013", "2017", "2021")
+
+# the following loop iterates through the list, uploads the csv file, cleans it and assigns it back to list
+for(i in seq_along(years)){
+  year <- years[i]
+  snem_list[[i]] <- clean_data(
+    read_csv2(glue("legislative-elections/snem_{year}.csv"),
+                              locale = locale(encoding = "UTF-8"))
+  )
+  snem_list[[i]]$year <- year
+}
+
+# combining data throughout the years to one dataframe
+snem_long <- rbind.fill(snem_list) %>%
+  mutate(year = factor(year))
+
+head(snem_long, 10)
+```
+
+As can be seen below, the dataframe consists mostly of categorical data with age being the only numeric variable
+```{r glimpse}
+glimpse(snem_long)
+```
+Missing values may be noticed in two columns: age and ideology. The latter may be due to candidates standing as independent.
+Although the former requires some investigation.
+```{r NAs}
+colSums(is.na(snem_long))
+```
+The missing age stands for missing candidates on initial elections paper. These entities can be deleted.
+```{r age NA}
+snem_long %>%
+        filter(is.na(age))
+```
+As can be seen below, the right-wing ideology prevails among the candidates, so we can impute the said ideology to missing data without the risk of messing up the ratios.
+```{r ideology table}
+table(snem_long$ideology)
+```
+```{r NA imputation}
+snem_long <- snem_long %>%
+        # deleting the dummy NA rows
+        filter(!is.na(age)) %>%
+        # imputing the majority group into NA values
+        replace_na(list(ideology = as.factor("Pravice")))
+
+colSums(is.na(snem_long))
+```
+Now when all missing data is taken care of, the exploratory analysis may be performed.
+
+### Exploratory Data Analysis
+#### Candidates' age distribution
+The first visualisation will be candidates' age distribution by sex throughout the years.
+The distributions seem consistent in all years. The median line shows us that mostly half of the candidates are younger than ~45 years.
+Males and females does not differ much in terms of distribution, albeit female candidates tend to be younger than their male opponents.
+```{r age dist}
+ggplot(snem_long, aes(age)) +
+        geom_density(aes(colour = sex, fill = sex), alpha = 0.1) +
+        geom_vline(aes(xintercept = median(age)), colour = "#CC8899") +
+        facet_wrap(vars(year)) +
+        labs(title = "Candidates' age distribution by sex throughout the years",
+             x = "Age",
+             y = "Density",
+             fill = "Sex",
+             colour = "Sex")
+```
+
+#### Sex ratio
+Male to female ratio seems to be consistent as well. Almost always it is 3:1, although in 2021 the share of female candidates has slightly increased.
+```{r sex ratio}
+ggplot(snem_long, aes(year)) +
+        geom_bar(aes(fill = sex), position = "fill") +
+        labs(title = "Sex ratio throughout the years",
+             x = "Year",
+             y = "Share",
+             fill = "Sex")
+```
+
+#### Candidates' ideologies count throughout the regions
+The next two visualisations compare candidates' ideologies in different regions throughout the years.
+As can be seen, right-wing ideology prevails among the candidates in all regions, albeit centrists are elected more often.
+```{r ideologies1}
+snem_long %>%
+  mutate(ideology = fct_relevel(ideology, "Levice", "Střed", "Pravice")) %>%
+  ggplot(aes(region)) +
+        geom_bar(aes(fill = ideology), position = "dodge") +
+        scale_fill_discrete(name = "Ideology", labels = c("Left-wing", "Centre", "Right-wing")) +
+        labs(title = "Candidates' ideologies count throughout the regions",
+             subtitle = "Aggregated data from all years",
+             x = "Region",
+             y = "Count") +
+        coord_flip()
+```
+```{r ideologies2}
+snem_long %>%
+  filter(mandate == "yes") %>%
+  mutate(ideology = fct_relevel(ideology, "Levice", "Střed", "Pravice")) %>%
+  ggplot(aes(region)) +
+  geom_bar(aes(fill = ideology), position = "dodge") +
+  scale_fill_discrete(name = "Ideology", labels = c("Left-wing", "Centre", "Right-wing")) +
+  labs(title = "Elected candidates' ideologies count throughout the regions",
+       subtitle = "Aggregated data from all years",
+       x = "Region",
+       y = "Count") +
+  coord_flip()
+```
+
+#### The most frequent fields of work
+This visualisation shows the most frequent fields of work.
+Private sector has the biggest representation, most candidates coming from this field have no university degree.
+The second most frequent group of candidates are those who are in politics already (e.g. mayors, governors), candidates coming from this field often possess university degree.
+The third field is businesspeople, university degrees are not prevalent in this group.
+```{r fields}
+snem_long %>%
+  mutate(field = fct_reorder(field, degree, .fun = "length", .desc = FALSE)) %>%
+  ggplot(aes(field)) +
+    geom_bar(aes(fill = degree), position = "dodge") +
+    labs(title = "The most frequent fields of work by candidate's education",
+         subtitle = "Aggregated data from all years",
+         x = "Field of work",
+         y = "Count",
+         fill = "Degree") +
+    coord_flip()
+```
+
+#### Candidates' ideologies ratio
+The last plot shows the share of ideologies based on whether the candidates have university degree or not.
+Candidates with no university education tend to be more right-wing, whilst the share of other ideologies is smaller in comparison.
+The presence of diploma seems to make candidates pick other ideologies as well: almost equal shares may be noticed.
+```{r ideology ratio}
+snem_long %>%
+  mutate(ideology = fct_relevel(ideology, "Levice", "Střed", "Pravice")) %>%
+    ggplot(aes(degree)) +
+        geom_bar(aes(fill = ideology), position = "fill") +
+        scale_fill_discrete(name = "Ideology", labels = c("Left-wing", "Centre", "Right-wing")) +
+        labs(title = "Candidates' ideologies ratio by their education level",
+             subtitle = "Aggregated data from all years",
+             x = "University degree",
+             y = "Share")
+```
+
+### Modelling
+In the last part different classification models will be trained and compared.
+Before that the data will be prepared accordingly -- unimportant variables will be removed.
+```{r ml df}
+library(caret) # caret package will be used for ML
+
+snem_ml <- snem_long %>%
+        select(-name, -year)
+
+head(snem_ml)
+```
+
+Original dataset is highly unbalanced:
+```{r unbalanced}
+table(snem_ml$mandate)
+```
+
+The combination of down- and upsampling will be used to achieve class' balance
+```{r rose balancing}
+library(ROSE)
+
+snemRose <- ROSE(mandate ~ ., data = snem_ml)$data %>%
+  # since age cannot have non-integer value, all values will be rounded down
+  mutate(age = floor(age))
+
+table(snemRose$mandate)
+```
+
+The last preprocessing step is categorical variable dummifying
+```{r dummifying}
+library(fastDummies) # library for variable dummifying
+
+snemDummified <- dummy_cols(snemRose, select_columns = c("degree", "sex", "field", "region", "ideology"),
+                            remove_selected_columns = TRUE)
+
+head(snemDummified)
+```
+
+The dataset will be divided into train and test by 3:1 ratio
+```{r partition}
+# train and test data partition
+trainIndex <- createDataPartition(snemRose$mandate, p = 0.75,
+                                  list = FALSE, times = 1)
+
+snemTrain <- snemRose[trainIndex, ]
+snemTest <- snemRose[-trainIndex, ]
+
+nrow(snemTrain)
+nrow(snemTest)
+```
+
+5 way cross validation will be used during training process.
+Following three algorithms are to be compared: Logistic Regression, Random Forest and Support Vector Classifier.
+Since the task is binary classification, ROC metric will be used to pick the best model during the grid search process.
+```{r glm}
+# 5-way Cross Validation initialisation
+ctrl <- trainControl(method = "cv",
+                     number = 5,
+                     classProbs = TRUE,
+                     summaryFunction = twoClassSummary)
+
+# Logistic Regression model fitting
+glmModel <- train(
+  mandate ~ ., data = snemTrain,
+  method = "glm",
+  trControl = ctrl,
+  metric = "ROC"
+)
+
+glmModel
+```
+```{r randf}
+library(ranger)
+
+# initialising the hyperparameter grid
+randfGrid <- expand.grid(mtry = c(4, 6),
+                         splitrule = "gini",
+                         min.node.size = seq(1, 6, 3))
+
+# Random Forest model fitting
+randfModel <- train(
+  mandate ~ ., data = snemTrain,
+  method = "ranger",
+  trControl = ctrl,
+  tuneGrid = randfGrid,
+  metric = "ROC"
+)
+
+randfModel
+```
+
+```{r svc}
+library(e1071)
+
+svcGrid <- expand.grid(cost = c(0.1, 1))
+
+svcModel <- train(
+  mandate ~ ., data = snemTrain,
+  method = "svmLinear2",
+  trControl = ctrl,
+  tuneGrid = svcGrid,
+  metric = "ROC"
+)
+
+svcModel
+```
+
+```{r resamps}
+resamps <- resamples(list(GLM = glmModel,
+                          RandF = randfModel,
+                          SVC = svcModel))
+
+summary(resamps)
+```
+As can be seen from the summary above and the plot below, Random Forest has the best ROC metric on training data, picking at ~0.92.
+SVC model has the biggest variance of sensitivity and specificity from all the models.
+```{r resamps comparison}
+bwplot(resamps, layout = c(3, 1))
+```
+
+Now the models will be assessed on testing data set.
+```{r predAndProb}
+# this function will be used to create class probabilities
+predAndProb <- function(origDf, model){
+  # binding the testing set with the predicted probabilities
+  modDf <- cbind(origDf, predict(model, newdata = origDf, type = "prob") %>%
+    # predicted class will be chosen based on biggest probability
+                            mutate("pred" = as.factor(names(.)[apply(., 1, which.max)])))
+
+  return(modDf)
+}
+
+snemGml <- predAndProb(snemTest, glmModel)
+snemRandf <- predAndProb(snemTest, randfModel)
+snemSvc <- predAndProb(snemTest, svcModel)
+```
+
+Confusion matrix shows the performance of an algorithm, with right predictions being on the main diagonal and wrong predictions on counter diagonal.
+The logistic regression defines the right class most times, although it often classifies negative class as positive, which resembles in lower sensitivity rate.
+```{r gml metrics 1}
+library(yardstick)
+
+conf_mat(snemGml, mandate, pred) %>%
+    autoplot(type = "heatmap") +
+        labs(title = "Logistic regression's confusion matrix") +
+        scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+```
+The confusion matrix above confirms the metrics below:
+```{r gml metrics 2}
+# yardstick's metric_Set will be used for models' assessment
+classMetrics <- metric_set(precision, sensitivity, specificity, roc_auc)
+
+classMetrics(snemGml, truth = mandate, estimate = pred, no)
+
+```
+Random forest's matrix on the other side looks much better. The model performs fairly well, the counter diagonal holds smaller numbers this time.
+Although this algorithm still struggles with assigning the positive class correctly, sensitivity rate still resembles this characteristic.
+```{r randf metrics 1}
+conf_mat(snemRandf, mandate, pred) %>%
+  autoplot(type = "heatmap") +
+  labs(title = "Random forest's confusion matrix") +
+  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+```
+```{r randf metrics 2}
+classMetrics(snemRandf, truth = mandate, estimate = pred, no)
+```
+The Support Vector Classifier model performs almost on the same level as logistic regression does, although this time the algorithm has hard time assigning the negative class right, which is resembled by precision rate.
+```{r svc metrics 1}
+conf_mat(snemSvc, mandate, pred) %>%
+  autoplot(type = "heatmap") +
+  labs(title = "Support vecto classifier's confusion matrix") +
+  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+```
+```{r svc metrics 2}
+classMetrics(snemSvc, truth = mandate, estimate = pred, no)
+```
+
+### Conclusion
+In this report following results have been found out:
+
+* Candidates' age distribution is almost symmetric
+* Sex ratio is 3:1 throughout the years
+* Right-wing ideology prevails among the candidates, albeit elected candidates represent the ideologies equally
+* Candidates from private sector, businesspeople and current politics take part in the elections the most
+* Candidate with no university degree tend to be right-wing, candidates with university degree tend to pick right-wing ideology less often
+
+Three models were compared during the modelling process: logistic regression, random forest and support vector classifier. The best one of them was random forest algorithm with ROC AUC around 0.92.
+Additionally, logistic regression's coefficients may be compared to see what features contribute the most to candidates' chances of winning (according to this model):
+```{r glm summary}
+summary(glmModel)
+```
+Age does not contribute much to overall chance, current politicians and lawyers have better chances in winning. Region and sex do not play a huge role. Right-wing ideology may contribute negatively, whilst centrists have higher chances.
