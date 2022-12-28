@@ -304,7 +304,7 @@ head(snemDummified)
 The dataset will be divided into train and test by 3:1 ratio
 ```{r partition}
 # train and test data partition
-trainIndex <- createDataPartition(snemRose$mandate, p = 0.75,
+trainIndex <- createDataPartition(snemDummified$mandate, p = 0.75,
                                   list = FALSE, times = 1)
 
 snemTrain <- snemDummified[trainIndex, ]
